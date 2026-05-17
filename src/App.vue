@@ -17,6 +17,7 @@
         @delete="deleteRule"
         @toggle="saveRule"
         @clone="startClone"
+        
       />
 
     </div>
@@ -48,8 +49,7 @@
         @edit="openEditCloneTaskDialog"
         @delete="removeCloneTaskHandler"
         @start="startCloneTaskHandler"
-        @pause="pauseCloneTaskHandler"
-        @resume="resumeCloneTaskHandler"
+        @stop="handleStopCloneTask"
       />
     </div>
     <RuleDialog
@@ -108,7 +108,8 @@ import {
   updateRule,
   removeRule,
   getLogs,
-  cloneRule
+  cloneRule,
+  stopCloneTask
 } from "./api/rules"
 
 
@@ -234,6 +235,16 @@ async function removeCloneTaskHandler(id) {
   await loadCloneTasks()
 }
 
+async function handleStopCloneTask  (row) {
+  try {
+    await stopCloneTask(row.id)
+    ElMessage.success("已停止克隆任务")
+    await loadCloneTasks()
+  } catch (e) {
+    console.error(e)
+    ElMessage.error("停止克隆任务失败")
+  }
+}
 function resetCurrentRule(){
 
   currentRule.id = null

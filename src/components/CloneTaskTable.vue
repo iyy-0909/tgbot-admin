@@ -30,7 +30,15 @@
           <el-button size="small" type="primary" @click="$emit('resume', row.id)">
             继续
           </el-button>
-
+            <el-button
+                v-if="row.status === 'running' || row.status === 'paused'"
+                size="small"
+                type="danger"
+                plain
+                @click="$emit('stop', row)"
+                >
+                停止
+        </el-button>
           <el-button size="small" @click="$emit('edit', row)">
             编辑
           </el-button>

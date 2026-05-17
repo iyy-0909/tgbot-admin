@@ -29,3 +29,6 @@ export function cloneRule(id, limit = 50, delay = 5) {
     `${API}/api/rules/${id}/clone?limit=${limit}&delay=${delay}`
   )
 }
+export function stopCloneTask(id) {
+  return axios.post(`/api/clone-tasks/${id}/stop`)
+}
