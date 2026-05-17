@@ -29,13 +29,6 @@
           <el-button size="small" type="danger" @click="$emit('delete', row.id)">
             删除
           </el-button>
-          <el-button
-            size="small"
-            type="success"
-            @click="$emit('clone', row)"
-          >
-            克隆
-          </el-button>
         </template>
       </el-table-column>
     </el-table>

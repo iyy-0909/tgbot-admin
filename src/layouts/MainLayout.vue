@@ -32,6 +32,9 @@
         <el-menu-item index="accounts">
           账号管理
         </el-menu-item>
+        <el-menu-item index="clone">
+          克隆任务
+        </el-menu-item>
       </el-menu>
 
     </el-aside>

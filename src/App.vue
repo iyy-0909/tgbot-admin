@@ -41,6 +41,17 @@
       />
     </div>
 
+    <div v-if="activeMenu === 'clone'">
+      <CloneTaskTable
+        :tasks="cloneTasks"
+        @add="openAddCloneTaskDialog"
+        @edit="openEditCloneTaskDialog"
+        @delete="removeCloneTaskHandler"
+        @start="startCloneTaskHandler"
+        @pause="pauseCloneTaskHandler"
+        @resume="resumeCloneTaskHandler"
+      />
+    </div>
     <RuleDialog
       :visible="dialogVisible"
       :form="currentRule"
@@ -58,7 +69,13 @@
       @submit="submitAccount"
     />
   </MainLayout>
-
+  <CloneTaskDialog
+    :visible="cloneTaskDialogVisible"
+    :form="currentCloneTask"
+    :is-edit="isCloneTaskEdit"
+    @update:visible="cloneTaskDialogVisible = $event"
+    @submit="submitCloneTask"
+  />
 </template>
 
 <script setup>
@@ -73,6 +90,17 @@ import StatusCards from "./components/StatusCards.vue"
 import RuleTable from "./components/RuleTable.vue"
 import RuleDialog from "./components/RuleDialog.vue"
 import LogPanel from "./components/LogPanel.vue"
+import CloneTaskTable from "./components/CloneTaskTable.vue"
+import CloneTaskDialog from "./components/CloneTaskDialog.vue"
+import {
+  getCloneTasks,
+  createCloneTask,
+  updateCloneTask,
+  deleteCloneTask,
+  startCloneTask,
+  pauseCloneTask,
+  resumeCloneTask
+} from "./api/cloneTasks"
 import {
   getStatus,
   getRules,
@@ -101,7 +129,7 @@ const isEdit = ref(false)
 
 const logs = ref([])
 const activeMenu = ref("rules")
-
+const cloneTasks = ref([])
 const currentRule = reactive({
 
   id: null,
@@ -118,7 +146,26 @@ const currentRule = reactive({
 
   footer: ""
 })
+const cloneTaskDialogVisible = ref(false)
+const isCloneTaskEdit = ref(false)
 
+const currentCloneTask = reactive({
+  id: null,
+  name: "",
+  source_channel: "",
+  target_channels: "[]",
+  account_id: 1,
+  clone_limit: 100,
+  single_delay: 3,
+  album_delay: 8,
+  target_delay: 2,
+  blocked_keywords: "[]",
+  replace_words: "{}",
+  footer: "",
+  enabled: true,
+  status: "idle",
+  last_message_id: 0
+})
 const accounts = ref([])
 const accountDialogVisible = ref(false)
 const isAccountEdit = ref(false)
@@ -139,6 +186,28 @@ async function loadStatus(){
   status.value = res.data
 }
 
+async function loadCloneTasks() {
+  const res = await getCloneTasks()
+  cloneTasks.value = res.data
+}
+
+async function startCloneTaskHandler(id) {
+  await startCloneTask(id)
+  ElMessage.success("克隆已开始")
+  await loadCloneTasks()
+}
+
+async function pauseCloneTaskHandler(id) {
+  await pauseCloneTask(id)
+  ElMessage.success("克隆已暂停")
+  await loadCloneTasks()
+}
+
+async function resumeCloneTaskHandler(id) {
+  await resumeCloneTask(id)
+  ElMessage.success("克隆已继续")
+  await loadCloneTasks()
+}
 
 async function loadRules(){
 
@@ -156,6 +225,13 @@ async function startClone(rule) {
   )
 
   ElMessage.success("克隆任务已开始，请查看日志")
+}
+async function removeCloneTaskHandler(id) {
+  await deleteCloneTask(id)
+
+  ElMessage.success("克隆任务已删除")
+
+  await loadCloneTasks()
 }
 
 function resetCurrentRule(){
@@ -307,6 +383,71 @@ async function submitRule(formData){
   await loadRules()
 }
 
+function resetCurrentCloneTask() {
+  Object.assign(currentCloneTask, {
+    id: null,
+    name: "",
+    source_channel: "",
+    target_channels: "[]",
+    account_id: 1,
+    clone_limit: 100,
+    single_delay: 3,
+    album_delay: 8,
+    target_delay: 2,
+    blocked_keywords: "[]",
+    replace_words: "{}",
+    footer: "",
+    enabled: true,
+    status: "idle",
+    last_message_id: 0
+  })
+}
+
+function openAddCloneTaskDialog() {
+  resetCurrentCloneTask()
+  isCloneTaskEdit.value = false
+  cloneTaskDialogVisible.value = true
+}
+
+function openEditCloneTaskDialog(row) {
+  Object.assign(currentCloneTask, row)
+  isCloneTaskEdit.value = true
+  cloneTaskDialogVisible.value = true
+}
+
+function validateCloneTaskJson() {
+  try {
+    JSON.parse(currentCloneTask.target_channels || "[]")
+    JSON.parse(currentCloneTask.blocked_keywords || "[]")
+    JSON.parse(currentCloneTask.replace_words || "{}")
+    return true
+  } catch {
+    ElMessage.error("目标频道、过滤关键词或替换词 JSON 格式错误")
+    return false
+  }
+}
+
+async function submitCloneTask(formData) {
+  Object.assign(currentCloneTask, formData)
+
+  if (!currentCloneTask.name || !currentCloneTask.source_channel) {
+    ElMessage.error("任务名称和源频道不能为空")
+    return
+  }
+
+  if (!validateCloneTaskJson()) return
+
+  if (isCloneTaskEdit.value) {
+    await updateCloneTask(currentCloneTask.id, currentCloneTask)
+    ElMessage.success("克隆任务保存成功")
+  } else {
+    await createCloneTask(currentCloneTask)
+    ElMessage.success("克隆任务添加成功")
+  }
+
+  cloneTaskDialogVisible.value = false
+  await loadCloneTasks()
+}
 
 async function saveRule(row){
 
@@ -371,7 +512,10 @@ async function handleMenuChange(menu){
     await loadLogs()
   }
   if (menu === "accounts") {
-  await loadAccounts()
+    await loadAccounts()
+  }
+  if (menu === "clone") {
+  await loadCloneTasks()
 }
 }
 
