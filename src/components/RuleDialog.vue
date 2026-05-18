@@ -1,36 +1,51 @@
 <template>
   <el-dialog
     :model-value="visible"
-    @update:model-value="$emit('update:visible', $event)"
     :title="isEdit ? '编辑规则' : '新增规则'"
-    width="600px"
+    width="620px"
+    @close="handleClose"
   >
-    <el-form label-width="120px">
-
+    <el-form
+      :model="localForm"
+      label-width="120px"
+      class="rule-form"
+    >
       <el-form-item label="源频道">
         <el-input
           v-model="localForm.source"
-          placeholder="例如 csaze888"
+          placeholder="例如：@source_channel"
         />
       </el-form-item>
 
       <el-form-item label="目标频道">
         <el-input
           v-model="localForm.target"
-          placeholder="例如 textclonel"
+          placeholder="例如：@target_channel"
         />
       </el-form-item>
 
       <el-form-item label="启用">
-        <el-switch v-model="localForm.enabled" />
+        <el-switch
+          v-model="localForm.enabled"
+          active-text="开启"
+          inactive-text="关闭"
+        />
+      </el-form-item>
+
+      <el-form-item label="删除旧联系方式">
+        <el-switch
+          v-model="localForm.remove_contact_lines"
+          active-text="删除"
+          inactive-text="保留"
+        />
       </el-form-item>
 
       <el-form-item label="过滤关键词">
         <el-input
           v-model="localForm.blocked_keywords"
           type="textarea"
-          :rows="3"
-          placeholder='例如 ["广告","诈骗"]'
+          :rows="4"
+          placeholder='例如：["极搜","yiso","soso"]'
         />
       </el-form-item>
 
@@ -38,8 +53,8 @@
         <el-input
           v-model="localForm.replace_words"
           type="textarea"
-          :rows="3"
-          placeholder='例如 {"旧词":"新词"}'
+          :rows="5"
+          placeholder='例如：{"旧词":"新词","阿泽":"学长"}'
         />
       </el-form-item>
 
@@ -47,29 +62,24 @@
         <el-input
           v-model="localForm.footer"
           type="textarea"
-          :rows="3"
+          :rows="4"
+          placeholder="发送时追加到文案末尾"
         />
       </el-form-item>
-
     </el-form>
 
     <template #footer>
-
-      <el-button
-        @click="$emit('update:visible', false)"
-      >
+      <el-button @click="handleClose">
         取消
       </el-button>
 
       <el-button
         type="primary"
-        @click="submit"
+        @click="handleSubmit"
       >
         保存
       </el-button>
-
     </template>
-
   </el-dialog>
 </template>
 
@@ -77,17 +87,23 @@
 import { reactive, watch } from "vue"
 
 const props = defineProps({
-
-  visible: Boolean,
-
-  form: Object,
-
-  isEdit: Boolean
+  visible: {
+    type: Boolean,
+    default: false,
+  },
+  form: {
+    type: Object,
+    required: true,
+  },
+  isEdit: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits([
   "update:visible",
-  "submit"
+  "submit",
 ])
 
 const localForm = reactive({
@@ -97,35 +113,54 @@ const localForm = reactive({
   enabled: true,
   blocked_keywords: "[]",
   replace_words: "{}",
-  footer: ""
+  footer: "",
+  remove_contact_lines: true,
+  clone_task_id: null,
 })
 
-
 watch(
-  () => props.form,
-
-  (newVal) => {
-
-    if (!newVal) return
-
-    Object.assign(
-      localForm,
-      newVal
-    )
+  () => props.visible,
+  (visible) => {
+    if (visible) {
+      Object.assign(localForm, {
+        id: props.form.id ?? null,
+        source: props.form.source || "",
+        target: props.form.target || "",
+        enabled: props.form.enabled ?? true,
+        blocked_keywords: props.form.blocked_keywords || "[]",
+        replace_words: props.form.replace_words || "{}",
+        footer: props.form.footer || "",
+        remove_contact_lines: props.form.remove_contact_lines ?? true,
+        clone_task_id: props.form.clone_task_id || null,
+      })
+    }
   },
-
   {
     immediate: true,
-    deep: true
-  }
+  },
 )
 
+const handleClose = () => {
+  emit("update:visible", false)
+}
 
-function submit(){
-
-  emit(
-    "submit",
-    { ...localForm }
-  )
+const handleSubmit = () => {
+  emit("submit", {
+    id: localForm.id,
+    source: localForm.source,
+    target: localForm.target,
+    enabled: localForm.enabled,
+    blocked_keywords: localForm.blocked_keywords || "[]",
+    replace_words: localForm.replace_words || "{}",
+    footer: localForm.footer || "",
+    remove_contact_lines: localForm.remove_contact_lines,
+    clone_task_id: localForm.clone_task_id,
+  })
 }
 </script>
+
+<style scoped>
+.rule-form {
+  padding-right: 12px;
+}
+</style>

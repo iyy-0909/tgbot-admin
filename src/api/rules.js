@@ -24,11 +24,15 @@ export function removeRule(id) {
 export function getLogs() {
   return axios.get(`${API}/api/logs`)
 }
+export function stopCloneTask(id) {
+  return axios.post(`${API}/api/clone-tasks/${id}/stop`)
+}
 export function cloneRule(id, limit = 50, delay = 5) {
   return axios.post(
     `${API}/api/rules/${id}/clone?limit=${limit}&delay=${delay}`
   )
 }
-export function stopCloneTask(id) {
-  return axios.post(`/api/clone-tasks/${id}/stop`)
+
+export function updateCloneTask(id, data) {
+  return axios.put(`${API}/api/clone-tasks/${id}`, data)
 }

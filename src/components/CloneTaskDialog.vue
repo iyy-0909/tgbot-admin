@@ -60,7 +60,11 @@
           placeholder='例如 {"旧词":"新词"}'
         />
       </el-form-item>
-
+        <el-form-item label="删除旧联系方式">
+        <el-switch
+            v-model="form.remove_contact_lines"
+        />
+        </el-form-item>
       <el-form-item label="尾巴 Footer">
         <el-input v-model="localForm.footer" type="textarea" :rows="3" />
       </el-form-item>
@@ -103,7 +107,8 @@ const localForm = reactive({
   footer: "",
   enabled: true,
   status: "idle",
-  last_message_id: 0
+  last_message_id: 0,
+  remove_contact_lines: true,
 })
 
 watch(
