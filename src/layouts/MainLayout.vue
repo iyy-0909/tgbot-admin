@@ -1,127 +1,125 @@
 <template>
   <el-container class="layout">
-
-    <el-aside
-      width="220px"
-      class="aside"
-    >
-
+    <el-aside width="220px" class="aside">
       <div class="logo">
         CloneBot
       </div>
 
       <el-menu
         :default-active="activeMenu"
+        class="menu"
         background-color="#111827"
         text-color="#cbd5e1"
         active-text-color="#ffffff"
-        @select="$emit('change-menu', $event)"
+        @select="handleSelect"
       >
-
         <el-menu-item index="rules">
-          频道规则
+          <span>频道规则</span>
+        </el-menu-item>
+
+        <el-menu-item index="clone">
+          <span>克隆任务</span>
+        </el-menu-item>
+
+        <el-menu-item index="bots">
+          <span>Bot 管理</span>
+        </el-menu-item>
+
+        <el-menu-item index="accounts">
+          <span>账号管理</span>
         </el-menu-item>
 
         <el-menu-item index="logs">
-          运行日志
-        </el-menu-item>
-
-        <el-menu-item index="settings">
-          系统设置
-        </el-menu-item>
-        <el-menu-item index="accounts">
-          账号管理
-        </el-menu-item>
-        <el-menu-item index="clone">
-          克隆任务
+          <span>运行日志</span>
         </el-menu-item>
       </el-menu>
-
     </el-aside>
 
-
     <el-container>
-
       <el-header class="header">
-
-        <div>
-          Telegram 自动化后台
+        <div class="header-title">
+          Telegram Clone System
         </div>
 
-        <el-tag type="success">
+        <el-tag
+          :type="status === 'running' ? 'success' : 'danger'"
+          size="small"
+        >
           {{ status || "unknown" }}
         </el-tag>
-
       </el-header>
 
-
-      <el-main>
-
+      <el-main class="main">
         <slot />
-
       </el-main>
-
     </el-container>
-
   </el-container>
 </template>
 
 <script setup>
-
 defineProps({
-
   status: {
     type: String,
-    default: "unknown"
+    default: "unknown",
   },
-
   activeMenu: {
     type: String,
-    default: "rules"
-  }
+    default: "rules",
+  },
 })
 
-defineEmits([
-  "change-menu"
+const emit = defineEmits([
+  "change-menu",
 ])
 
+const handleSelect = (menu) => {
+  emit("change-menu", menu)
+}
 </script>
 
 <style scoped>
-
-.layout{
-  min-height:100vh;
+.layout {
+  min-height: 100vh;
 }
 
-.aside{
-  background:#111827;
+.aside {
+  background: #111827;
+  color: #cbd5e1;
 }
 
-.logo{
-  height:60px;
-  line-height:60px;
-
-  color:white;
-
-  font-size:22px;
-
-  font-weight:bold;
-
-  text-align:center;
+.logo {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  padding-left: 22px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.header{
-  background:white;
-
-  display:flex;
-
-  align-items:center;
-
-  justify-content:space-between;
-
-  font-size:18px;
-
-  border-bottom:1px solid #e5e7eb;
+.menu {
+  border-right: none;
 }
 
+.header {
+  height: 60px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+}
+
+.header-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.main {
+  background: #f3f4f6;
+  padding: 20px;
+}
 </style>

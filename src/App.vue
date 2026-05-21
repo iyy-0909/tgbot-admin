@@ -34,6 +34,26 @@
       />
     </div>
 
+    <div v-if="activeMenu === 'bots'" class="bot-page">
+      <BotTable
+        :bots="bots"
+        @add="openAddBotDialog"
+        @edit="openEditBotDialog"
+        @delete="deleteBotHandler"
+        @toggle="saveBotStatus"
+        @test="testBotHandler"
+      />
+
+      <BotBindingTable
+        :bindings="botBindings"
+        :bots="bots"
+        @add="openAddBotBindingDialog"
+        @edit="openEditBotBindingDialog"
+        @delete="deleteBotBindingHandler"
+        @toggle="saveBotBindingStatus"
+      />
+    </div>
+
     <div v-if="activeMenu === 'clone'">
       <CloneTaskTable
         :tasks="cloneTasks"
@@ -63,6 +83,23 @@
       @update:visible="accountDialogVisible = $event"
       @submit="submitAccount"
     />
+
+    <BotDialog
+      :visible="botDialogVisible"
+      :form="currentBot"
+      :is-edit="isBotEdit"
+      @update:visible="botDialogVisible = $event"
+      @submit="submitBot"
+    />
+
+    <BotBindingDialog
+      :visible="botBindingDialogVisible"
+      :form="currentBotBinding"
+      :bots="bots"
+      :is-edit="isBotBindingEdit"
+      @update:visible="botBindingDialogVisible = $event"
+      @submit="submitBotBinding"
+    />
   </MainLayout>
 
   <CloneTaskDialog
@@ -86,6 +123,11 @@ import LogPanel from "./components/LogPanel.vue"
 
 import AccountTable from "./components/AccountTable.vue"
 import AccountDialog from "./components/AccountDialog.vue"
+
+import BotTable from "./components/BotTable.vue"
+import BotDialog from "./components/BotDialog.vue"
+import BotBindingTable from "./components/BotBindingTable.vue"
+import BotBindingDialog from "./components/BotBindingDialog.vue"
 
 import CloneTaskTable from "./components/CloneTaskTable.vue"
 import CloneTaskDialog from "./components/CloneTaskDialog.vue"
@@ -118,11 +160,27 @@ import {
   removeAccount,
 } from "./api/accounts"
 
+import {
+  getBots,
+  createBot,
+  updateBot,
+  deleteBot,
+  getBotBindings,
+  createBotBinding,
+  updateBotBinding,
+  deleteBotBinding,
+  testBot,
+  sendBotTest
+} from "./api/bots"
+
+
 
 const status = ref({})
 const rules = ref([])
 const logs = ref([])
 const accounts = ref([])
+const bots = ref([])
+const botBindings = ref([])
 const cloneTasks = ref([])
 
 const activeMenu = ref("rules")
@@ -130,11 +188,17 @@ const activeMenu = ref("rules")
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 
-const cloneTaskDialogVisible = ref(false)
-const isCloneTaskEdit = ref(false)
-
 const accountDialogVisible = ref(false)
 const isAccountEdit = ref(false)
+
+const botDialogVisible = ref(false)
+const isBotEdit = ref(false)
+
+const botBindingDialogVisible = ref(false)
+const isBotBindingEdit = ref(false)
+
+const cloneTaskDialogVisible = ref(false)
+const isCloneTaskEdit = ref(false)
 
 let cloneRefreshTimer = null
 
@@ -149,6 +213,35 @@ const currentRule = reactive({
   footer: "",
   remove_contact_lines: true,
   clone_task_id: null,
+})
+
+
+const currentAccount = reactive({
+  id: null,
+  name: "",
+  session_path: "",
+  proxy: "",
+  enabled: true,
+  remark: "",
+})
+
+
+const currentBot = reactive({
+  id: null,
+  name: "",
+  token: "",
+  enabled: true,
+  remark: "",
+  last_error: "",
+})
+
+
+const currentBotBinding = reactive({
+  id: null,
+  target_channel: "",
+  bot_id: null,
+  enabled: true,
+  remark: "",
 })
 
 
@@ -173,16 +266,6 @@ const currentCloneTask = reactive({
 })
 
 
-const currentAccount = reactive({
-  id: null,
-  name: "",
-  session_path: "",
-  proxy: "",
-  enabled: true,
-  remark: "",
-})
-
-
 async function loadStatus() {
   const res = await getStatus()
   status.value = res.data
@@ -201,20 +284,43 @@ async function loadLogs() {
 }
 
 
-async function loadCloneTasks() {
-  const res = await getCloneTasks()
-  cloneTasks.value = res.data
-}
-
-
 async function loadAccounts() {
   const res = await getAccounts()
   accounts.value = res.data
 }
 
 
+async function loadBots() {
+  const res = await getBots()
+  bots.value = res.data
+}
+
+
+async function loadBotBindings() {
+  const res = await getBotBindings()
+  botBindings.value = res.data
+}
+
+
+async function loadBotPage() {
+  await loadBots()
+  await loadBotBindings()
+}
+
+
+async function loadCloneTasks() {
+  const res = await getCloneTasks()
+  cloneTasks.value = res.data
+}
+
+
 async function handleMenuChange(menu) {
   activeMenu.value = menu
+
+  if (menu === "rules") {
+    await loadStatus()
+    await loadRules()
+  }
 
   if (menu === "logs") {
     await loadLogs()
@@ -224,13 +330,12 @@ async function handleMenuChange(menu) {
     await loadAccounts()
   }
 
-  if (menu === "clone") {
-    await loadCloneTasks()
+  if (menu === "bots") {
+    await loadBotPage()
   }
 
-  if (menu === "rules") {
-    await loadStatus()
-    await loadRules()
+  if (menu === "clone") {
+    await loadCloneTasks()
   }
 }
 
@@ -359,13 +464,308 @@ async function deleteRule(id) {
 
 
 async function startClone(rule) {
-  await cloneRule(
-    rule.id,
-    50,
-    5,
+  await cloneRule(rule.id, 50, 5)
+  ElMessage.success("克隆任务已开始，请查看日志")
+}
+
+
+// =========================
+// 账号管理
+// =========================
+
+function resetCurrentAccount() {
+  currentAccount.id = null
+  currentAccount.name = ""
+  currentAccount.session_path = ""
+  currentAccount.proxy = ""
+  currentAccount.enabled = true
+  currentAccount.remark = ""
+}
+
+
+function openAddAccountDialog() {
+  resetCurrentAccount()
+  isAccountEdit.value = false
+  accountDialogVisible.value = true
+}
+
+
+function openEditAccountDialog(row) {
+  Object.assign(currentAccount, row)
+  isAccountEdit.value = true
+  accountDialogVisible.value = true
+}
+
+
+async function submitAccount(formData) {
+  Object.assign(currentAccount, formData)
+
+  if (!currentAccount.name || !currentAccount.session_path) {
+    ElMessage.error("账号名称和 Session 路径不能为空")
+    return
+  }
+
+  if (isAccountEdit.value) {
+    await updateAccount(currentAccount.id, {
+      name: currentAccount.name,
+      session_path: currentAccount.session_path,
+      proxy: currentAccount.proxy,
+      enabled: currentAccount.enabled,
+      remark: currentAccount.remark,
+    })
+
+    ElMessage.success("账号保存成功")
+  } else {
+    await createAccount({
+      name: currentAccount.name,
+      session_path: currentAccount.session_path,
+      proxy: currentAccount.proxy,
+      remark: currentAccount.remark,
+    })
+
+    ElMessage.success("账号添加成功")
+  }
+
+  accountDialogVisible.value = false
+  await loadAccounts()
+}
+
+
+async function saveAccount(row) {
+  await updateAccount(row.id, {
+    name: row.name,
+    session_path: row.session_path,
+    proxy: row.proxy,
+    enabled: row.enabled,
+    remark: row.remark,
+  })
+
+  ElMessage.success("账号状态已更新")
+}
+
+
+async function deleteAccount(id) {
+  await ElMessageBox.confirm(
+    "确定删除这个账号？",
+    "确认删除",
+    {
+      type: "warning",
+    },
   )
 
-  ElMessage.success("克隆任务已开始，请查看日志")
+  await removeAccount(id)
+
+  ElMessage.success("账号已删除")
+
+  await loadAccounts()
+}
+
+
+// =========================
+// Bot 管理
+// =========================
+
+function resetCurrentBot() {
+  currentBot.id = null
+  currentBot.name = ""
+  currentBot.token = ""
+  currentBot.enabled = true
+  currentBot.remark = ""
+  currentBot.last_error = ""
+}
+
+
+function openAddBotDialog() {
+  resetCurrentBot()
+  isBotEdit.value = false
+  botDialogVisible.value = true
+}
+
+
+function openEditBotDialog(row) {
+  Object.assign(currentBot, {
+    id: row.id,
+    name: row.name || "",
+    token: row.token || "",
+    enabled: row.enabled ?? true,
+    remark: row.remark || "",
+    last_error: row.last_error || "",
+  })
+
+  isBotEdit.value = true
+  botDialogVisible.value = true
+}
+
+
+async function submitBot(formData) {
+  Object.assign(currentBot, formData)
+
+  if (!currentBot.name || !currentBot.token) {
+    ElMessage.error("Bot 名称和 Token 不能为空")
+    return
+  }
+
+  const payload = {
+    name: currentBot.name,
+    token: currentBot.token,
+    enabled: currentBot.enabled,
+    remark: currentBot.remark || "",
+  }
+
+  if (isBotEdit.value) {
+    await updateBot(currentBot.id, payload)
+    ElMessage.success("Bot 保存成功")
+  } else {
+    await createBot(payload)
+    ElMessage.success("Bot 添加成功")
+  }
+
+  botDialogVisible.value = false
+
+  await loadBots()
+}
+
+
+async function saveBotStatus(row, value) {
+  await updateBot(row.id, {
+    enabled: value,
+  })
+
+  ElMessage.success(value ? "Bot 已启用" : "Bot 已停用")
+
+  await loadBots()
+}
+
+async function testBotHandler(row) {
+  try {
+    const res = await testBot(row.id)
+
+    if (res.data.ok) {
+      ElMessage.success(`Bot 正常：@${res.data.bot.username}`)
+    } else {
+      ElMessage.error(res.data.message || "Bot 测试失败")
+    }
+  } catch (e) {
+    console.error(e)
+    ElMessage.error("Bot 测试失败")
+  }
+}
+
+async function deleteBotHandler(id) {
+  await ElMessageBox.confirm(
+    "确定删除这个 Bot？删除后会同时删除相关目标频道绑定。",
+    "确认删除",
+    {
+      type: "warning",
+    },
+  )
+
+  await deleteBot(id)
+
+  ElMessage.success("Bot 已删除")
+
+  await loadBotPage()
+}
+
+
+// =========================
+// 目标频道绑定 Bot
+// =========================
+
+function resetCurrentBotBinding() {
+  currentBotBinding.id = null
+  currentBotBinding.target_channel = ""
+  currentBotBinding.bot_id = null
+  currentBotBinding.enabled = true
+  currentBotBinding.remark = ""
+}
+
+
+function openAddBotBindingDialog() {
+  if (!bots.value.length) {
+    ElMessage.warning("请先添加 Bot")
+    return
+  }
+
+  resetCurrentBotBinding()
+  isBotBindingEdit.value = false
+  botBindingDialogVisible.value = true
+}
+
+
+function openEditBotBindingDialog(row) {
+  Object.assign(currentBotBinding, {
+    id: row.id,
+    target_channel: row.target_channel || "",
+    bot_id: row.bot_id || null,
+    enabled: row.enabled ?? true,
+    remark: row.remark || "",
+  })
+
+  isBotBindingEdit.value = true
+  botBindingDialogVisible.value = true
+}
+
+
+async function submitBotBinding(formData) {
+  Object.assign(currentBotBinding, formData)
+
+  if (!currentBotBinding.target_channel) {
+    ElMessage.error("目标频道不能为空")
+    return
+  }
+
+  if (!currentBotBinding.bot_id) {
+    ElMessage.error("请选择 Bot")
+    return
+  }
+
+  const payload = {
+    target_channel: currentBotBinding.target_channel,
+    bot_id: currentBotBinding.bot_id,
+    enabled: currentBotBinding.enabled,
+    remark: currentBotBinding.remark || "",
+  }
+
+  if (isBotBindingEdit.value) {
+    await updateBotBinding(currentBotBinding.id, payload)
+    ElMessage.success("绑定保存成功")
+  } else {
+    await createBotBinding(payload)
+    ElMessage.success("绑定添加成功")
+  }
+
+  botBindingDialogVisible.value = false
+
+  await loadBotBindings()
+}
+
+
+async function saveBotBindingStatus(row, value) {
+  await updateBotBinding(row.id, {
+    enabled: value,
+  })
+
+  ElMessage.success(value ? "绑定已启用" : "绑定已停用")
+
+  await loadBotBindings()
+}
+
+
+async function deleteBotBindingHandler(id) {
+  await ElMessageBox.confirm(
+    "确定删除这个绑定？",
+    "确认删除",
+    {
+      type: "warning",
+    },
+  )
+
+  await deleteBotBinding(id)
+
+  ElMessage.success("绑定已删除")
+
+  await loadBotBindings()
 }
 
 
@@ -552,98 +952,6 @@ const handleToggleCloneListener = async (row, value) => {
 
 
 // =========================
-// 账号管理
-// =========================
-
-function resetCurrentAccount() {
-  currentAccount.id = null
-  currentAccount.name = ""
-  currentAccount.session_path = ""
-  currentAccount.proxy = ""
-  currentAccount.enabled = true
-  currentAccount.remark = ""
-}
-
-
-function openAddAccountDialog() {
-  resetCurrentAccount()
-  isAccountEdit.value = false
-  accountDialogVisible.value = true
-}
-
-
-function openEditAccountDialog(row) {
-  Object.assign(currentAccount, row)
-  isAccountEdit.value = true
-  accountDialogVisible.value = true
-}
-
-
-async function submitAccount(formData) {
-  Object.assign(currentAccount, formData)
-
-  if (!currentAccount.name || !currentAccount.session_path) {
-    ElMessage.error("账号名称和 Session 路径不能为空")
-    return
-  }
-
-  if (isAccountEdit.value) {
-    await updateAccount(currentAccount.id, {
-      name: currentAccount.name,
-      session_path: currentAccount.session_path,
-      proxy: currentAccount.proxy,
-      enabled: currentAccount.enabled,
-      remark: currentAccount.remark,
-    })
-
-    ElMessage.success("账号保存成功")
-  } else {
-    await createAccount({
-      name: currentAccount.name,
-      session_path: currentAccount.session_path,
-      proxy: currentAccount.proxy,
-      remark: currentAccount.remark,
-    })
-
-    ElMessage.success("账号添加成功")
-  }
-
-  accountDialogVisible.value = false
-  await loadAccounts()
-}
-
-
-async function saveAccount(row) {
-  await updateAccount(row.id, {
-    name: row.name,
-    session_path: row.session_path,
-    proxy: row.proxy,
-    enabled: row.enabled,
-    remark: row.remark,
-  })
-
-  ElMessage.success("账号状态已更新")
-}
-
-
-async function deleteAccount(id) {
-  await ElMessageBox.confirm(
-    "确定删除这个账号？",
-    "确认删除",
-    {
-      type: "warning",
-    },
-  )
-
-  await removeAccount(id)
-
-  ElMessage.success("账号已删除")
-
-  await loadAccounts()
-}
-
-
-// =========================
 // 生命周期
 // =========================
 
@@ -674,5 +982,11 @@ onUnmounted(() => {
 body {
   margin: 0;
   background: #f3f4f6;
+}
+
+.bot-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 </style>
